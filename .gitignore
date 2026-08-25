@@ -226,3 +226,19 @@ __marimo__/
 .streamlit/secrets.toml
 
 .DS_Store
+
+# AI Fine-tuning & Training Artifacts
+dataset/
+model/
+train/
+reports/
+tests/eval_*
+tests/structuring_accuracy_report.md
+scripts/colab_gpu_watch.py
+scripts/colab_sync.py
+scripts/download_model.py
+scripts/eval_checkpoint.py
+scripts/eval_structuring.py
+scripts/prepare_dataset.py
+sample_data/playground_prompt.md
+sample_data/집계 방식.md
