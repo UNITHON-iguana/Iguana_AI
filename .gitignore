@@ -3,6 +3,7 @@
 .env.*
 *.env
 !.env.example
+*.pem
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -57,7 +58,6 @@ coverage.xml
 .hypothesis/
 .pytest_cache/
 cover/
-tests/*/
 
 # Translations
 *.mo
@@ -225,20 +225,20 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 
+# OS Generated
 .DS_Store
+**/.DS_Store
 
-# AI Fine-tuning & Training Artifacts
+# AI Fine-tuning, Experiments, Evaluations & Artifacts
 dataset/
 model/
 train/
 reports/
-tests/eval_*
-tests/structuring_accuracy_report.md
-scripts/colab_gpu_watch.py
-scripts/colab_sync.py
-scripts/download_model.py
-scripts/eval_checkpoint.py
-scripts/eval_structuring.py
-scripts/prepare_dataset.py
+scripts/experiments/
+scripts/dev/
+scripts/tools/
 sample_data/playground_prompt.md
 sample_data/집계 방식.md
+sample_data/**/photos/
+sample_data/**/tables/
+sample_data/**/sample_test_results.json

@@ -2,24 +2,52 @@
 
 import json
 from pathlib import Path
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
-from src.structuring.engine import BaseStructuringEngine
-from src.structuring.prompt import StructuringPromptBuilder
-from src.structuring.repository import (
-    BaseWorkTypeRepository,
-    LocalJsonWorkTypeRepository,
-)
-from src.structuring.schemas import (
-    InputRecord,
-    StructuredItem,
-    StructuredRecord,
-    StructuringResult,
-    WorkTypeItem,
-)
-from src.structuring.service import BaseResponseHandler, StructuringService
+try:
+    from ai.src.structuring.engine import (
+        BaseStructuringEngine,
+        GeminiStructuringEngine,
+    )
+    from ai.src.structuring.prompt import StructuringPromptBuilder
+    from ai.src.structuring.repository import (
+        BaseWorkTypeRepository,
+        LocalJsonWorkTypeRepository,
+    )
+    from ai.src.structuring.schemas import (
+        InputRecord,
+        LLMStructuredItem,
+        LLMStructuredRecord,
+        LLMStructuringBatchResponse,
+        StructuredItem,
+        StructuredRecord,
+        StructuringResult,
+        WorkTypeItem,
+    )
+    from ai.src.structuring.service import BaseResponseHandler, StructuringService
+except ImportError:
+    from src.structuring.engine import (
+        BaseStructuringEngine,
+        GeminiStructuringEngine,
+    )
+    from src.structuring.prompt import StructuringPromptBuilder
+    from src.structuring.repository import (
+        BaseWorkTypeRepository,
+        LocalJsonWorkTypeRepository,
+    )
+    from src.structuring.schemas import (
+        InputRecord,
+        LLMStructuredItem,
+        LLMStructuredRecord,
+        LLMStructuringBatchResponse,
+        StructuredItem,
+        StructuredRecord,
+        StructuringResult,
+        WorkTypeItem,
+    )
+    from src.structuring.service import BaseResponseHandler, StructuringService
 
 
 class TestWorkTypeRepository:
@@ -59,6 +87,9 @@ class TestPromptBuilder:
         assert "ID 201: 보온덕트벽체" in prompt
         assert "시공면 계수" in prompt
         assert "Few-Shot 예시" in prompt
+        # 보수적 파싱 및 환각 방지 지침 검증
+        assert "잘못된 정보 출력 < 미출력" in prompt
+        assert "items: []" in prompt
 
     def test_build_user_content(self):
         records = [
@@ -94,6 +125,146 @@ class TestSchemas:
         assert record.items[0].matchedWorkTypeId == 101
         assert record.items[0].spec == "65"
         assert record.items[0].quantity == 2.0
+
+    def test_llm_structured_record_validation(self):
+        record_data = {
+            "location": "지하4",
+            "workDate": "2024-06-28",
+            "items": [
+                {
+                    "matchedWorkTypeId": 101,
+                    "workType": "금속관벽체",
+                    "spec": "65",
+                    "quantity": 2.0,
+                    "evidence": "보 65 양면",
+                    "confidence": "HIGH",
+                }
+            ],
+        }
+        record = LLMStructuredRecord.model_validate(record_data)
+        assert len(record.items) == 1
+        assert record.items[0].confidence == "HIGH"
+        assert record.items[0].evidence == "보 65 양면"
+
+
+class TestAllOrNothingPostProcessing:
+    """단일 결측 또는 낮은 신뢰도 발생 시 전면 빈 리스트([]) 처리 로직 테스트."""
+
+    @patch.object(GeminiStructuringEngine, "__init__", return_value=None)
+    def test_all_or_nothing_with_one_null_item(self, mock_init):
+        engine = GeminiStructuringEngine()
+        engine.model = "gemini-3.7-flash"
+        engine.temperature = 0.0
+        engine.thinking_level = "MEDIUM"
+        engine.thinking_budget = None
+        engine._api_key = "dummy"
+        engine._client = MagicMock()
+
+        # LLM 응답 시뮬레이션: 3개 중 1개의 spec이 null인 경우
+        mock_response = MagicMock()
+        mock_response.text = json.dumps({
+            "records": [
+                {
+                    "location": "101동 3층",
+                    "workDate": "2024-06-28",
+                    "items": [
+                        {
+                            "matchedWorkTypeId": 101,
+                            "workType": "금속관벽체",
+                            "spec": "50",
+                            "quantity": 1.0,
+                            "confidence": "HIGH",
+                        },
+                        {
+                            "matchedWorkTypeId": 101,
+                            "workType": "금속관벽체",
+                            "spec": None,  # 👈 결측
+                            "quantity": 1.0,
+                            "confidence": "LOW",
+                        },
+                        {
+                            "matchedWorkTypeId": 201,
+                            "workType": "보온덕트벽체",
+                            "spec": "1000*500",
+                            "quantity": 2.0,
+                            "confidence": "HIGH",
+                        },
+                    ],
+                }
+            ]
+        })
+        engine._client.models.generate_content.return_value = mock_response
+
+        work_types = [
+            WorkTypeItem(id=101, name="금속관벽체"),
+            WorkTypeItem(id=201, name="보온덕트벽체"),
+        ]
+        result = engine.process(
+            [InputRecord(text="보 50 보 치수없음 보 1000*500")], work_types
+        )
+
+        assert result.success is True
+        assert len(result.records) == 1
+        # All-or-Nothing 규칙에 의해 1개라도 결측이 있으면 items는 빈 리스트 [] 여야 함
+        assert result.records[0].items == []
+        assert result.records[0].location == "101동 3층"
+        assert result.records[0].workDate == "2024-06-28"
+
+    @patch.object(GeminiStructuringEngine, "__init__", return_value=None)
+    def test_all_or_nothing_all_valid_items(self, mock_init):
+        engine = GeminiStructuringEngine()
+        engine.model = "gemini-3.7-flash"
+        engine.temperature = 0.0
+        engine.thinking_level = "MEDIUM"
+        engine.thinking_budget = None
+        engine._api_key = "dummy"
+        engine._client = MagicMock()
+
+        # LLM 응답 시뮬레이션: 모두 정상적인 경우
+        mock_response = MagicMock()
+        mock_response.text = json.dumps({
+            "records": [
+                {
+                    "location": "지하4",
+                    "workDate": "2024-06-28",
+                    "items": [
+                        {
+                            "matchedWorkTypeId": 101,
+                            "workType": "금속관벽체",
+                            "spec": "50",
+                            "quantity": 2.0,
+                            "evidence": "보 50*2",
+                            "confidence": "HIGH",
+                        },
+                        {
+                            "matchedWorkTypeId": 201,
+                            "workType": "보온덕트벽체",
+                            "spec": "1000*500",
+                            "quantity": 1.0,
+                            "evidence": "보 1000*500",
+                            "confidence": "HIGH",
+                        },
+                    ],
+                }
+            ]
+        })
+        engine._client.models.generate_content.return_value = mock_response
+
+        work_types = [
+            WorkTypeItem(id=101, name="금속관벽체"),
+            WorkTypeItem(id=201, name="보온덕트벽체"),
+        ]
+        result = engine.process(
+            [InputRecord(text="보 50*2 보 1000*500")], work_types
+        )
+
+        assert result.success is True
+        assert len(result.records) == 1
+        assert len(result.records[0].items) == 2
+        assert result.records[0].items[0].matchedWorkTypeId == 101
+        assert result.records[0].items[0].spec == "50"
+        assert result.records[0].items[1].matchedWorkTypeId == 201
+        assert result.records[0].items[1].spec == "1000*500"
 
 
 class TestStructuringService:

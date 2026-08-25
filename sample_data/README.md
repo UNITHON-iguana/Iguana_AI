@@ -8,20 +8,20 @@
 
 ```text
 ai/sample_data/
-├── photos/                         # 실제 현장 사진 32장 (378.jpg ~ 409.jpg)
-│   ├── 378.jpg
-│   ├── 379.jpg
-│   └── ...
+├── test_samples/                   # [단위 테스트 대상 샘플 데이터] 32건 Ground Truth
+│   ├── photos/                     # 현장 원본 사진 32장 (378.jpg ~ 409.jpg)
+│   ├── tables/                     # 크롭된 보드판 정답 이미지 32장
+│   └── annotations/                # 정답 라벨링 및 실무자 엑셀 데이터
+│       ├── BS.xlsm                 # 실무자 작성 원본 엑셀 장부 (매크로 포함)
+│       ├── photo_daeji.json        # 사진대지 시트 정답 JSON (32건 레코드)
+│       ├── photo_daeji.csv         # 사진대지 시트 정답 CSV
+│       ├── daily_summary.json      # 일일 집계표 시트 정답 JSON (159개 항목)
+│       ├── cumulative.json         # 기성 누계표 시트 정답 JSON (105개 항목)
+│       ├── ground_truth_mapping.md # 32개 사진 ↔ 엑셀 1:1 정답 매핑표
+│       └── sheet_structure.md      # 엑셀 시트 컬럼 ↔ 도메인 모델 매핑 명세
 │
-├── excel/
-│   ├── BS.xlsm                     # 실무자 작성 원본 엑셀 (매크로 포함)
-│   ├── BS_photo_daeji.json         # 사진대지 시트 파싱 JSON (photo_no & file_name 매핑 포함)
-│   ├── BS_photo_daeji.csv          # 사진대지 시트 파싱 CSV
-│   ├── BS_daily_summary.json       # 집계표 시트 파싱 JSON (159개 일일 집계 항목)
-│   ├── BS_cumulative.json          # 누계 시트 파싱 JSON (105개 기성 누계 항목)
-│   └── sheet_structure.md          # 엑셀 시트 컬럼 ↔ 도메인 모델 매핑 명세
-│
-├── dataset_mapping.md              # 32개 사진 ↔ 엑셀 1:1 매핑 정답표 (Ground Truth)
+├── playground_prompt.md            # Gemini Playground 테스트용 프롬프트
+├── 집계 방식.md                     # 공종별(배관/덕트/마감) 도메인 집계 규칙 분석서
 └── README.md                       # 본 안내 문서
 ```
 

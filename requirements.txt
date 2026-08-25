@@ -1,0 +1,23 @@
+# ==============================================================================
+# 현장노트 AI (Field Note AI) - AI 분석 서버 의존성 패키지 명세서
+# ==============================================================================
+
+# Web Framework & Server
+fastapi>=0.110.0
+uvicorn[standard]>=0.28.0
+
+# Data Validation & Serialization
+pydantic>=2.0.0
+
+# HTTP Client (Async Image Download)
+httpx>=0.27.0
+
+# Google GenAI SDK (Gemini OCR & Structuring)
+google-genai>=0.1.0
+
+# Environment Variables
+python-dotenv>=1.0.0
+
+# Computer Vision & Image Processing (Headless for Linux Server)
+opencv-python-headless>=4.8.0
+numpy>=1.24.0

@@ -20,8 +20,11 @@ from pydantic import ValidationError
 from .prompt import StructuringPromptBuilder
 from .schemas import (
     InputRecord,
+    LLMStructuredItem,
+    LLMStructuredRecord,
+    LLMStructuringBatchResponse,
+    StructuredItem,
     StructuredRecord,
-    StructuringBatchResponse,
     StructuringResult,
     WorkTypeItem,
 )
@@ -62,7 +65,8 @@ class GeminiStructuringEngine(BaseStructuringEngine):
 
     - 기본 모델: gemini-3.7-flash
     - 추론(Thinking): Medium 레벨 적용
-    - 응답: StructuringBatchResponse Pydantic Structured Output 강제
+    - 응답: LLMStructuringBatchResponse Pydantic Structured Output 강제
+    - 후처리: 단 하나의 필드/아이템이라도 결측 시 items=[] 처리 (All-or-Nothing 무결성 보장)
     """
 
     DEFAULT_MODEL = "gemini-3.7-flash"
@@ -118,7 +122,7 @@ class GeminiStructuringEngine(BaseStructuringEngine):
             "system_instruction": system_instruction,
             "temperature": self.temperature,
             "response_mime_type": "application/json",
-            "response_schema": StructuringBatchResponse,
+            "response_schema": LLMStructuringBatchResponse,
         }
 
         # [Thinking 설정 적용]
@@ -179,23 +183,65 @@ class GeminiStructuringEngine(BaseStructuringEngine):
 
             # [응답 역직렬화 및 검증]
             parsed_data = json.loads(raw_text)
-            records: List[StructuredRecord] = []
+            llm_records: List[LLMStructuredRecord] = []
 
             if isinstance(parsed_data, dict) and "records" in parsed_data:
-                batch_resp = StructuringBatchResponse.model_validate(parsed_data)
-                records = batch_resp.records
+                batch_resp = LLMStructuringBatchResponse.model_validate(parsed_data)
+                llm_records = batch_resp.records
             elif isinstance(parsed_data, list):
                 for item in parsed_data:
-                    records.append(StructuredRecord.model_validate(item))
+                    llm_records.append(LLMStructuredRecord.model_validate(item))
             elif isinstance(parsed_data, dict):
-                records.append(StructuredRecord.model_validate(parsed_data))
+                llm_records.append(LLMStructuredRecord.model_validate(parsed_data))
+
+            # [엄격한 All-or-Nothing 후처리 필터링 및 외부/서버 DTO 변환]
+            final_records: List[StructuredRecord] = []
+            for r in llm_records:
+                has_invalid_item = False
+                valid_items: List[StructuredItem] = []
+
+                for it in r.items:
+                    # 단 하나라도 공종ID가 없거나, 규격이 없거나, 신뢰도가 LOW인 경우
+                    if (
+                        it.matchedWorkTypeId is None
+                        or it.spec is None
+                        or it.quantity is None
+                        or it.confidence == "LOW"
+                    ):
+                        has_invalid_item = True
+                        logger.warning(
+                            f"[Strict All-or-Nothing] 결측 또는 불확실한 항목 감지 "
+                            f"(workTypeId={it.matchedWorkTypeId}, spec={it.spec}, conf={it.confidence}) "
+                            f"-> 해당 레코드의 전체 items를 빈 리스트([])로 초기화"
+                        )
+                        break
+
+                    valid_items.append(
+                        StructuredItem(
+                            matchedWorkTypeId=it.matchedWorkTypeId,
+                            workType=it.workType,
+                            spec=it.spec,
+                            quantity=it.quantity,
+                        )
+                    )
+
+                # All-or-Nothing 규칙: 단 하나의 아이템이라도 결측/LOW이면 전체 items = []
+                final_items = [] if has_invalid_item else valid_items
+
+                final_records.append(
+                    StructuredRecord(
+                        location=r.location,
+                        workDate=r.workDate,
+                        items=final_items,
+                    )
+                )
 
             logger.info(
-                f"Gemini API 정형화 완료 (레코드 {len(records)}개 생성, 소요시간: {elapsed:.2f}s)"
+                f"Gemini API 정형화 완료 (레코드 {len(final_records)}개 생성, 소요시간: {elapsed:.2f}s)"
             )
             return StructuringResult(
                 success=True,
-                records=records,
+                records=final_records,
                 raw_response=raw_text,
                 execution_time_sec=elapsed,
                 model_used=self.model,

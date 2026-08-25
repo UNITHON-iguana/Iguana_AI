@@ -27,8 +27,11 @@ from table_crop import (
 
 @pytest.fixture
 def sample_data_paths():
-    photos_dir = ai_root / "sample_data" / "photos"
-    tables_dir = ai_root / "sample_data" / "tables"
+    sample_dir = ai_root / "sample_data" / "test_samples_1"
+    if not sample_dir.exists():
+        sample_dir = ai_root / "sample_data" / "test_samples"
+    photos_dir = sample_dir / "photos"
+    tables_dir = sample_dir / "tables"
     return photos_dir, tables_dir
 
 

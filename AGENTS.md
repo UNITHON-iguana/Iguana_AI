@@ -30,22 +30,34 @@
 ```
 ai/
 ├── src/
-│   └── table_crop/          # [완료] 표(보드판) 영역 검출 및 크롭 모듈
-│       ├── __init__.py
-│       ├── loader.py        # BaseImageLoader, FileImageLoader, BytesImageLoader
-│       ├── cropper.py       # TableCropper, CropResult (OpenCV 기반 검출)
-│       ├── saver.py         # BaseImageSaver, FileImageSaver, BytesImageSaver
-│       └── pipeline.py      # TableCropPipeline (단일/배치/디렉토리 처리)
-├── scripts/
-│   └── crop_tables.py       # [완료] 디렉토리 내 이미지 표 일괄 크롭 CLI 스크립트
-├── tests/
-│   └── test_table_cropper.py # [완료] 표 크롭 파이프라인 단위 테스트 (pytest)
-├── sample_data/
-│   ├── tables/              # [완료] 크롭된 표 샘플 이미지들
-│   └── ...                  # 현장 샘플 사진 및 공사 데이터 엑셀
-├── data_preparation.ipynb   # 데이터 분석 및 알고리즘 검증 노트북
+│   ├── table_crop/          # [완료] 표(보드판) 영역 검출 및 크롭 모듈
+│   ├── ocr/                 # [완료] Gemini 비전 기반 보드판 OCR 추출 모듈
+│   ├── structuring/         # [완료] LLM 공사 텍스트 정형화 및 공종 분류 모듈
+│   └── server/              # [완료] FastAPI 기반 통합 분석 REST API 서버
+├── scripts/                 # [Git 추적] 프로덕션 서비스 및 모듈 CLI 구동 스크립트
+│   ├── run_server.py        # FastAPI 서버 구동
+│   ├── crop_tables.py       # 표 크롭 일괄 처리 CLI
+│   ├── run_ocr.py           # OCR 일괄 처리 CLI
+│   ├── run_structuring.py   # 텍스트 정형화/공종 분류 CLI
+│   └── experiments/         # [Git 제외] 모델 파인튜닝, 평가, 데이터셋 전처리, 모니터링 스크립트
+├── tests/                   # [Git 추적] 순수 단위 테스트 코드 및 최소 Mock fixture
+├── reports/                 # [Git 제외] 성능 평가/오차 분석 리포트 및 실행 산출물
+├── sample_data/             # 현장 샘플 사진 및 공사 데이터
 └── AGENTS.md                # AI 파이프라인 지침
 ```
+
+---
+
+## 📜 디렉토리 및 스크립트 관리 규칙
+
+1. **서비스 실행용 스크립트 (`ai/scripts/`)**:
+   - 프로덕션 배포, 통합 서버 구동(`run_server.py`), 핵심 모듈 CLI 등 실제 서비스 운영에 필요한 스크립트만 저장 (Git 관리 대상).
+2. **개발/실험/파인튜닝 스크립트 (`ai/scripts/experiments/` 또는 `ai/scripts/dev/`)**:
+   - LoRA/파인튜닝 학습, 체크포인트 평가, 데이터셋 정제/중복제거, Colab 연동/GPU 모니터링 등 연구/실험용 스크립트는 반드시 `scripts/experiments/`에 저장 (`.gitignore` 적용).
+3. **단위 테스트 디렉토리 (`ai/tests/`)**:
+   - 순수 단위/통합 테스트 코드(`test_*.py`)와 필수 Mock fixture 데이터만 유지합니다. 벤치마크 및 성능 평가 결과 파일은 `reports/eval/`로 격리 저장합니다.
+4. **에이전트 준수 사항**:
+   - 에이전트는 파일 및 스크립트 생성 시 목적을 명확히 판단하여 올바른 디렉토리에 생성해야 합니다.
 
 ---
 
@@ -77,3 +89,4 @@ results = pipeline.process_directory(
 ## ⚠️ 핵심 구현 원칙
 - **할루시네이션 엄격 방지**: LLM 프롬프트 및 응답 검증(Pydantic 등)을 통해 사진에 없는 정보의 임의 추정을 원천 차단.
 - **예외 처리**: 비정형 보드판 서식, 저화질 이미지, 일부 필드 누락 시에도 전체 프로세스가 중단되지 않고 부분 성공/검수 대상 처리 가능하도록 설계.
+- **스크립트 격리 원칙 준수**: 서비스 운영 스크립트 외의 연구/실험 코드가 Git 트리에 혼입되지 않도록 격리.

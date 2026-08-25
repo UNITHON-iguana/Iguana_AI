@@ -10,7 +10,7 @@ from typing import List, Sequence
 from .schemas import InputRecord, WorkTypeItem
 
 FEW_SHOT_EXAMPLES = """
-[Few-Shot 예시 1: 다중 배관 규격 및 단면/양면]
+[Few-Shot 예시 1: 다중 배관 규격 및 단면/양면 (완전 정상 케이스)]
 입력:
 [
   {
@@ -31,17 +31,17 @@ FEW_SHOT_EXAMPLES = """
       "location": "지하4",
       "workDate": "2024-06-28",
       "items": [
-        { "matchedWorkTypeId": 101, "spec": "20", "quantity": 2.0 },
-        { "matchedWorkTypeId": 101, "spec": "100", "quantity": 1.0 },
-        { "matchedWorkTypeId": 101, "spec": "50", "quantity": 1.0 }
+        { "matchedWorkTypeId": 101, "workType": "금속관벽체", "spec": "20", "quantity": 2.0, "evidence": "보 20*2 양면", "confidence": "HIGH" },
+        { "matchedWorkTypeId": 101, "workType": "금속관벽체", "spec": "100", "quantity": 1.0, "evidence": "100 양면", "confidence": "HIGH" },
+        { "matchedWorkTypeId": 101, "workType": "금속관벽체", "spec": "50", "quantity": 1.0, "evidence": "50 양면", "confidence": "HIGH" }
       ]
     },
     {
       "location": "3동 31층",
       "workDate": "2024-06-29",
       "items": [
-        { "matchedWorkTypeId": 101, "spec": "150", "quantity": 0.5 },
-        { "matchedWorkTypeId": 101, "spec": "50", "quantity": 1.5 }
+        { "matchedWorkTypeId": 101, "workType": "금속관벽체", "spec": "150", "quantity": 0.5, "evidence": "보 150 단면", "confidence": "HIGH" },
+        { "matchedWorkTypeId": 101, "workType": "금속관벽체", "spec": "50", "quantity": 1.5, "evidence": "50*3 단면", "confidence": "HIGH" }
       ]
     }
   ]
@@ -68,32 +68,32 @@ FEW_SHOT_EXAMPLES = """
       "location": "지하2층",
       "workDate": "2024-07-01",
       "items": [
-        { "matchedWorkTypeId": 202, "spec": "2000*600", "quantity": 0.5 },
-        { "matchedWorkTypeId": 301, "spec": "2000*600", "quantity": 0.5 }
+        { "matchedWorkTypeId": 202, "workType": "무보온덕트벽체", "spec": "2000*600", "quantity": 0.5, "evidence": "무 2000*600 단면", "confidence": "HIGH" },
+        { "matchedWorkTypeId": 301, "workType": "차열재마감", "spec": "2000*600", "quantity": 0.5, "evidence": "차열마감1번 단면", "confidence": "HIGH" }
       ]
     },
     {
       "location": "지하1층",
       "workDate": "2024-07-01",
       "items": [
-        { "matchedWorkTypeId": 201, "spec": "1000*500", "quantity": 2.0 },
-        { "matchedWorkTypeId": 301, "spec": "1000*500", "quantity": 4.0 }
+        { "matchedWorkTypeId": 201, "workType": "보온덕트벽체", "spec": "1000*500", "quantity": 2.0, "evidence": "보 1000*500*2 양면", "confidence": "HIGH" },
+        { "matchedWorkTypeId": 301, "workType": "차열재마감", "spec": "1000*500", "quantity": 4.0, "evidence": "차열마감2번 양면", "confidence": "HIGH" }
       ]
     }
   ]
 }
 
-[Few-Shot 예시 3: 혼합 공종 (덕트 + 차열재 + 오픈구 + 배관)]
+[Few-Shot 예시 3: Negative/노이즈 케이스 - 비공사 텍스트, 안전 슬로건, 공지사항]
 입력:
 [
   {
-    "text": "2번 벽체 보 2000*800 차열마감2번 오프구2000*200 단면",
-    "location": "지하3층",
+    "text": "현장 안전 제일 정리정돈 철저 및 안전모 착용",
+    "location": "101동 1층",
     "workDate": "2024-07-02"
   },
   {
-    "text": "1벽체 보덕트 1000*500 차열두벌 보D 100. 단면",
-    "location": "지하3층",
+    "text": "오전 TBM 실시 및 위험성 평가 회의 진행",
+    "location": null,
     "workDate": "2024-07-02"
   }
 ]
@@ -101,22 +101,44 @@ FEW_SHOT_EXAMPLES = """
 {
   "records": [
     {
-      "location": "지하3층",
+      "location": "101동 1층",
       "workDate": "2024-07-02",
-      "items": [
-        { "matchedWorkTypeId": 201, "spec": "2000*800", "quantity": 0.5 },
-        { "matchedWorkTypeId": 301, "spec": "2000*800", "quantity": 1.0 },
-        { "matchedWorkTypeId": 308, "spec": "2000*200", "quantity": 0.5 }
-      ]
+      "items": []
     },
     {
-      "location": "지하3층",
+      "location": null,
       "workDate": "2024-07-02",
-      "items": [
-        { "matchedWorkTypeId": 201, "spec": "1000*500", "quantity": 0.5 },
-        { "matchedWorkTypeId": 301, "spec": "1000*500", "quantity": 1.0 },
-        { "matchedWorkTypeId": 101, "spec": "100", "quantity": 0.5 }
-      ]
+      "items": []
+    }
+  ]
+}
+
+[Few-Shot 예시 4: Negative/결측 케이스 - 규격이나 공종이 모호하여 파싱 불가]
+입력:
+[
+  {
+    "text": "벽체 배관 보수 작업 완료 및 점검 확인",
+    "location": "지하 2층",
+    "workDate": "2024-07-03"
+  },
+  {
+    "text": "보강 작업 완료 (치수 미기재)",
+    "location": "103동",
+    "workDate": null
+  }
+]
+출력:
+{
+  "records": [
+    {
+      "location": "지하 2층",
+      "workDate": "2024-07-03",
+      "items": []
+    },
+    {
+      "location": "103동",
+      "workDate": null,
+      "items": []
     }
   ]
 }
@@ -147,48 +169,46 @@ class StructuringPromptBuilder:
         work_types_block = "\n".join(work_type_lines)
 
         system_instruction = f"""당신은 건설 현장(내화채움구조, 설비, 배관, 덕트 공사 등)의 비정형 작업 기록 텍스트를 분석하여 구조화된 공사 데이터(JSON)로 정규화하는 전문 AI 파서입니다.
-입력된 현장 텍스트(보드판 OCR 텍스트, 작업 일지 원문 등)로부터 작업 위치(location), 작업 일자(workDate), 그리고 세부 작업 품목 목록(items)을 추출하여 지정된 스키마의 `records` 목록에 맞게 정형화하십시오.
+
+================================================================================
+🚨 [최우선 핵심 철학: 잘못된 정보 출력 < 미출력(Null / 빈 리스트)]
+1. 건설 현장 데이터의 신뢰성을 위해, 잘못된 추측이나 허위 생성(Hallucination)은 시스템에 치명적입니다.
+2. 확실하지 않거나 모호한 정보는 억지로 추측하여 채우지 말고, 반드시 `null` 또는 `items: []`로 포기하십시오. 사용자가 직접 검수 화면에서 확인하고 입력하도록 하는 것이 훨씬 더 안전하고 바람직합니다.
+3. 원문에 명시적인 텍스트 근거(치수, 공종명 등)가 없다면 절대 임의로 상상하거나 유추하지 마십시오.
+================================================================================
 
 ---
 
 ### [표준 WorkType (공종/품목) 정의 테이블]
-원문의 작업 내용을 분석하여 가장 적합한 WorkType의 `id`를 `matchedWorkTypeId`에 매핑하십시오. 매칭되는 항목이 없거나 불확실한 경우 `null`로 지정하십시오.
+원문의 작업 내용을 분석하여 가장 적합한 WorkType의 `id`를 `matchedWorkTypeId`에 매핑하십시오. 매칭되는 항목이 없거나 불확실한 경우 반드시 `null`로 지정하십시오.
 
 {work_types_block}
 
 ---
 
-### [필드별 파싱 및 계산 규칙]
+### [필드별 파싱 및 엄격한 규칙]
 
 1. **`location` (시공 위치)**:
-   - 동, 층, 세대, 구역 정보가 원문에 포함된 경우 문자열로 추출 (예: "지하4", "3동 38층", "3동 1.2세대 31층").
-   - 위치 정보가 전혀 없거나 식별 불가능한 경우 null.
+   - 동, 층, 세대, 구역 정보가 원문에 명시된 경우에만 추출 (예: "지하4", "3동 38층", "3동 1.2세대 31층").
+   - 위치 정보가 전혀 없거나 식별 불가능한 경우 반드시 null.
 
 2. **`workDate` (작업 일자)**:
-   - "YYYY-MM-DD" 표준 형식으로 변환 (예: "2024-06-28").
-   - 날짜 정보가 없으면 null.
+   - 원문에 날짜가 명시된 경우 "YYYY-MM-DD" 표준 형식으로 변환 (예: "2024-06-28").
+   - 날짜 정보가 없으면 반드시 null.
 
-3. **`items` (세부 품목 배열)**:
-   원문에 여러 품목이 나열되어 있으면 개별 품목 객체로 분리하여 배열에 추가하십시오.
+3. **`items` (세부 품목 배열 - 올-오어-너씽 원칙)**:
+   - 비공사 텍스트(안전구호, 정리정돈, TBM, 회의 등)이거나 공종/규격이 전혀 특정되지 않는 경우 반드시 **`items: []` (빈 리스트)**로 응답하십시오.
+   - 여러 품목이 있을 때 명확한 근거가 있는 항목만 추출하되, 근거가 모호하거나 누락된 항목은 생성하지 마십시오.
 
    - **`matchedWorkTypeId` (정수 또는 null)**:
      - 위 [표준 WorkType 정의 테이블]의 고유 ID 매핑.
-     - 키워드 매핑 가이드:
-       * `보` + 배관치수(D65, 50 등) ➔ 금속관벽체 또는 금속관입상 ID
-       * `무` + 배관치수 ➔ 금속관벽체 또는 금속관입상 ID
-       * `PVC` + 배관치수 ➔ PVC벽체 또는 PVC입상 ID
-       * `보` + 사각치수(1600*600 등) / `보덕트` ➔ 보온덕트벽체 또는 보온덕트입상 ID
-       * `무` + 사각치수 / `무덕트` ➔ 무보온덕트벽체 또는 무보온덕트입상 ID
-       * `차열`, `차열마감`, `차열재` ➔ 차열재마감 ID
-       * `오프`, `오프구`, `오픈`, `오픈구` ➔ 오픈구 ID
-       * `단파`, `FVD`, `FD` ➔ 댐퍼팽창테이프 ID
-       * `충전재마감`, `프레싱마감` ➔ 덕트마감 ID
-       * `실리콘`, `실란트`, `구멍마감`, `틈새마감` ➔ 실란트마감벽체 ID
+     - ⚠️ **단어 오인 주의**: 단일 글자 '보', '무'가 '보강', '보온재', '무소음', '정보' 등 일반 단어의 일부로 쓰인 경우 절대 공종으로 매핑하지 마십시오.
+     - 명확한 배관/덕트 치수와 결합된 축약어(`보 50`, `무 1600*600`, `PVC 100` 등)일 때만 해당 공종 ID로 매핑하십시오.
 
    - **`spec` (규격 문자열 또는 null)**:
      * **배관류**: 호칭경(직경 mm) 단일 정수 문자열 (예: "15", "20", "32", "50", "65", "80", "100", "125", "150", "200"). 'D', 'A', 'Ø', '파이', '보', '무' 등의 접두/접미사는 제거.
      * **덕트류**: `가로*세로` 단면 치수 (예: "1600*600", "800*400", "2000*500").
-     * **특수/마감류**: 연결된 덕트/개구부의 `가로*세로` 치수 상속 (예: 차열재마감, 오픈구는 "2000*600", "800*200"). 치수가 없는 실란트/구멍마감/슬리브는 null.
+     * **특수/마감류**: 연결된 덕트/개구부의 `가로*세로` 치수 상속. 원문에 명시된 치수가 없으면 반드시 null.
 
    - **`quantity` (시공 수량, 부동소수점 Float)**:
      * **[공식]**: `[기본 개수]` × `[시공면 계수]`
@@ -197,19 +217,19 @@ class StructuringPromptBuilder:
        - `단면` (벽체): 0.5 (한쪽 면만 시공 시 0.5개소 인정)
        - `입상` (층간 관통): 1.0 (층당 1회 시공)
      * **기본 개수 산출**:
-       - `*N` 또는 `N개` 표기가 있으면 N개 (예: `50*2` ➔ 2개, `150*3` ➔ 3개).
-       - 수량 표기가 없으면 기본 1개.
-     * **차열재마감(`차열재마감`) 수량 특수 공식**:
-       - `[덕트 개수]` × `[도포 횟수(한벌/1번=1, 두벌/2번=2, N번=N)]` × `[시공면 계수(단면 0.5, 양면 1.0)]`
-       - 예1: 차열 1번 + 단면 ➔ 1 × 1 × 0.5 = 0.5
-       - 예2: 차열 2번 + 단면 ➔ 1 × 2 × 0.5 = 1.0
-       - 예3: 차열 2번 + 양면 ➔ 1 × 2 × 1.0 = 2.0
-       - 예4: 덕트 2개(*2) + 차열 2번 + 양면 ➔ 2 × 2 × 1.0 = 4.0
+       - `*N` 또는 `N개` 표기가 있으면 N개 (예: `50*2` ➔ 2개, `150*3` ➔ 3개). 수량 표기 없으면 기본 1개.
+
+   - **`evidence` (추출 근거 텍스트)**:
+     - 원문에서 이 품목과 규격, 수량을 추출한 실제 단어/문구 (예: "보 20*2 양면"). 근거가 없으면 "NONE".
+
+   - **`confidence` (신뢰도: "HIGH" | "MEDIUM" | "LOW")**:
+     - 원문에 공종, 규격, 수량이 모두 명확히 적혀 있으면 "HIGH".
+     - 일부 단어가 모호하거나 추정 요소가 있으면 반드시 "LOW".
 
 ---
 
 ### [엄격한 제약 사항]
-1. **임의 추정 금지 (No Hallucination)**: 원문에 명시되지 않은 치수, 수량, 날짜 등은 절대 임의로 추정하지 마십시오.
+1. **임의 추정 절대 금지 (Zero Hallucination)**: 원문에 없는 정보는 절대 생성하지 마십시오.
 2. 입력된 각 레코드에 대해 반드시 순서를 유지하며 1:1로 대응되는 결과를 `records` 목록에 담아 출력하십시오.
 
 ---
